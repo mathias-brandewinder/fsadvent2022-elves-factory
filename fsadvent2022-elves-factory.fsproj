@@ -6,6 +6,10 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Simulation.fs" />
+    <Compile Include="Estimation.fs" />
     <Compile Include="Program.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="DiffSharp-cpu" Version="1.0.7" />
   </ItemGroup>
 </Project>

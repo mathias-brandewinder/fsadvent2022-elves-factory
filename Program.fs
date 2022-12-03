@@ -78,4 +78,25 @@ module App =
             |> Seq.take 10
             |> Seq.iter (fun incident -> printfn "%A" incident)
 
+        // Maximum Likelihood Estimation
+
+        let sample =
+            tape
+            |> Seq.take 1000
+            |> Seq.toArray
+
+        let ribbon =
+            sample
+            |> Estimation.prepare 0
+            |> Estimation.estimate
+
+        printfn "Ribbon: %A" ribbon
+
+        let paper =
+            sample
+            |> Estimation.prepare 1
+            |> Estimation.estimate
+
+        printfn "Paper: %A" paper
+
         0
