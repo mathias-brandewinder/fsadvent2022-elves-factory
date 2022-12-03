@@ -44,7 +44,7 @@ module App =
         let sample =
             tape
             |> Seq.pairwise
-            |> Seq.filter (fun (previousIncident, incident) -> incident.Cause = 0)
+            |> Seq.filter (fun (_, incident) -> incident.Cause = 0)
             |> Seq.take 1000
             |> Seq.map (fun (previousIncident, incident) ->
                 (incident.FailureTime - previousIncident.RestartTime).TotalHours
@@ -52,6 +52,9 @@ module App =
 
         sample
         |> Chart.Histogram
+        |> Chart.withTitle "Ribbon: time to failure"
+        |> Chart.withXAxisStyle "time (hours)"
+        |> Chart.withYAxisStyle "number of failures"
         |> Chart.show
 
         // Weibull tape
@@ -132,35 +135,56 @@ module App =
             |> Array.sumBy (fun (observed, time) ->
                 if observed
                 then density weibull time |> log
-                else cumulative weibull time |> log
+                else (1.0 - cumulative weibull time) |> log
                 )
 
         let ribbonSample =
             sample
             |> Estimation.prepare 0
-            |> Array.take 200
+            |> Array.take 100
+
+        let ks = [ 0.5 .. 0.05 .. 2.0 ]
+        let lambdas = [ 0.5 .. 0.05 .. 2.0 ]
 
         let z =
             [
-                for k in 0.5 .. 0.05 .. 1.5 ->
-                    [ for l in 0.5 .. 0.05 .. 1.5 -> likelihood (k, l) ribbonSample ]
+                for k in ks ->
+                    [ for lambda in lambdas -> likelihood (k, lambda) ribbonSample ]
             ]
 
-        Chart.Surface(z, X = [ 0.5 .. 0.05 .. 1.5 ], Y = [ 0.5 .. 0.05 .. 1.5 ])
+        Chart.Surface (
+            z,
+            X = ks,
+            Y = lambdas,
+            Contours = TraceObjects.Contours.initXyz(Show = true)
+            )
+        |> Chart.withTitle "Ribbon: log likelihood"
+        |> Chart.withXAxisStyle ("k", Id = StyleParam.SubPlotId.Scene 1)
+        |> Chart.withYAxisStyle ("lambda", Id = StyleParam.SubPlotId.Scene 1)
+        |> Chart.withZAxisStyle "log likelihood"
         |> Chart.show
 
         let paperSample =
             sample
             |> Estimation.prepare 1
-            |> Array.take 200
+            |> Array.take 100
 
         let z =
             [
-                for k in 0.5 .. 0.05 .. 1.5 ->
-                    [ for l in 0.5 .. 0.05 .. 1.5 -> likelihood (k, l) paperSample ]
+                for k in ks ->
+                    [ for lambda in lambdas -> likelihood (k, lambda) paperSample ]
             ]
 
-        Chart.Surface(z, X = [ 0.5 .. 0.05 .. 1.5 ], Y = [ 0.5 .. 0.05 .. 1.5 ], Contours=TraceObjects.Contours.initXyz(Show=true))
+        Chart.Surface (
+            z,
+            X = ks,
+            Y = lambdas,
+            Contours = TraceObjects.Contours.initXyz(Show = true)
+            )
+        |> Chart.withTitle "Paper: log likelihood"
+        |> Chart.withXAxisStyle ("k", Id = StyleParam.SubPlotId.Scene 1)
+        |> Chart.withYAxisStyle ("lambda", Id = StyleParam.SubPlotId.Scene 1)
+        |> Chart.withZAxisStyle "log likelihood"
         |> Chart.show
 
         let ribbon =
