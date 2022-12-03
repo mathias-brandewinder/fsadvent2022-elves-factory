@@ -1,5 +1,21 @@
 namespace FsAdvent2022
 
+module Weibull =
+
+    open System
+
+    // https://en.wikipedia.org/wiki/Weibull_distribution
+    type Weibull = {
+        /// Shape parameter
+        K: float
+        /// Scale parameter
+        Lambda: float
+        }
+        with
+        member this.Simulate (rng: Random) =
+            let p = rng.NextDouble ()
+            this.Lambda * (- log (1.0 - p)) ** (1.0 / this.K)
+
 module Simulation =
 
     open System
@@ -29,7 +45,7 @@ module Simulation =
 
     let simulate (rng: Random) (failures: FailureCause []) =
 
-        let startTime = DateTime.Now
+        let startTime = DateTime(2022, 12, 24)
 
         startTime
         |> Seq.unfold (fun currentTime ->
