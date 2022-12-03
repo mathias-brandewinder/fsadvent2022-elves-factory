@@ -11,5 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="DiffSharp-cpu" Version="1.0.7" />
+    <PackageReference Include="Plotly.NET" Version="3.0.1" />
   </ItemGroup>
 </Project>
