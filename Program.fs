@@ -14,18 +14,21 @@ module App =
         // Simple tape: uniform distribution
         printfn "Incidents: Uniform distribution"
 
-        let causes =
-            [|
-                {
-                    Name = "Ribbon"
-                    TimeToFailure = fun rng -> TimeSpan.FromHours (rng.NextDouble())
-                    TimeToFix = fun rng ->  TimeSpan.FromHours (rng.NextDouble())
-                }
-                {
-                    Name = "Paper"
-                    TimeToFailure = fun rng -> TimeSpan.FromHours (rng.NextDouble())
-                    TimeToFix = fun rng ->  TimeSpan.FromHours (rng.NextDouble())
-                }
+        let causes = [|
+            {
+                Name = "Ribbon"
+                TimeToFailure =
+                    fun rng -> TimeSpan.FromHours (rng.NextDouble())
+                TimeToFix =
+                    fun rng -> TimeSpan.FromHours (rng.NextDouble())
+            }
+            {
+                Name = "Paper"
+                TimeToFailure =
+                    fun rng -> TimeSpan.FromHours (rng.NextDouble())
+                TimeToFix =
+                    fun rng -> TimeSpan.FromHours (rng.NextDouble())
+            }
             |]
 
         let rng = Random 0
@@ -36,7 +39,7 @@ module App =
 
         let sample =
             tape
-            |> Seq.take 10
+            |> Seq.take 5
             |> Seq.iter (fun incident -> printfn "%A" incident)
 
         // What do we observe?
@@ -60,8 +63,6 @@ module App =
         // Weibull tape
         printfn "Incidents: Weibull distribution"
 
-        let hours = TimeSpan.FromHours
-
         let weibullRibbon = {
             K = 1.2
             Lambda = 0.8
@@ -72,43 +73,36 @@ module App =
             Lambda = 1.2
             }
 
-        let cumulative (weibull: Weibull) =
-            fun time ->
-                1.0
-                - exp (- ((time / weibull.Lambda) ** weibull.K))
-
-        let density (weibull: Weibull) =
-            fun (time: float) ->
-                (weibull.K / weibull.Lambda)
-                *
-                ((time / weibull.Lambda) ** (weibull.K - 1.0))
-                *
-                exp (- ((time / weibull.Lambda) ** weibull.K))
-
         let times = [ 0.2 .. 0.2 .. 5.0 ]
 
         [
-            Chart.Line(xy = (times |> List.map (fun t -> t, cumulative weibullRibbon t)), Name = "Ribbon")
-            Chart.Line(xy = (times |> List.map (fun t -> t, cumulative weibullPaper t)), Name = "Paper")
-
+            Chart.Line (
+                xy = (times |> List.map (fun t -> t, weibullRibbon.CDF t)),
+                Name = "Ribbon"
+                )
+            Chart.Line (
+                xy = (times |> List.map (fun t -> t, weibullPaper.CDF t)),
+                Name = "Paper"
+                )
         ]
         |> Chart.combine
         |> Chart.withXAxisStyle "Time (hours)"
         |> Chart.withYAxisStyle "Proba already failed"
         |> Chart.show
 
-        let causes =
-            [|
-                {
-                    Name = "Ribbon"
-                    TimeToFailure = weibullRibbon.Simulate >> hours
-                    TimeToFix = fun rng ->  TimeSpan.FromHours (rng.NextDouble())
-                }
-                {
-                    Name = "Paper"
-                    TimeToFailure = weibullPaper.Simulate >> hours
-                    TimeToFix = fun rng ->  TimeSpan.FromHours (rng.NextDouble())
-                }
+        let hours = TimeSpan.FromHours
+
+        let causes = [|
+            {
+                Name = "Ribbon"
+                TimeToFailure = weibullRibbon.Simulate >> hours
+                TimeToFix = fun rng -> TimeSpan.FromHours (rng.NextDouble())
+            }
+            {
+                Name = "Paper"
+                TimeToFailure = weibullPaper.Simulate >> hours
+                TimeToFix = fun rng -> TimeSpan.FromHours (rng.NextDouble())
+            }
             |]
 
         let rng = Random 0
@@ -119,37 +113,42 @@ module App =
 
         let sample =
             tape
-            |> Seq.take 10
+            |> Seq.take 5
             |> Seq.iter (fun incident -> printfn "%A" incident)
+
+        tape
+        |> Seq.take 100
+        |> Seq.countBy (fun incident -> incident.Cause)
+        |> Seq.iter (printfn "%A")
 
         // Maximum Likelihood Estimation
 
         let sample =
             tape
-            |> Seq.take 1000
+            |> Seq.take 100
             |> Seq.toArray
 
-        let likelihood (k, lambda) sample =
+        let likelihood (k, lambda) (sample: (bool * float) []) =
             let weibull = { K = k; Lambda = lambda }
             sample
             |> Array.sumBy (fun (observed, time) ->
                 if observed
-                then density weibull time |> log
-                else (1.0 - cumulative weibull time) |> log
+                then weibull.PDF time |> log
+                else (1.0 - weibull.CDF time) |> log
                 )
 
         let ribbonSample =
             sample
             |> Estimation.prepare 0
-            |> Array.take 100
+            |> Array.truncate 100
 
         let ks = [ 0.5 .. 0.05 .. 2.0 ]
         let lambdas = [ 0.5 .. 0.05 .. 2.0 ]
 
         let z =
             [
-                for k in ks ->
-                    [ for lambda in lambdas -> likelihood (k, lambda) ribbonSample ]
+                for lambda in lambdas ->
+                    [ for k in ks -> likelihood (k, lambda) ribbonSample ]
             ]
 
         Chart.Surface (
@@ -167,12 +166,12 @@ module App =
         let paperSample =
             sample
             |> Estimation.prepare 1
-            |> Array.take 100
+            |> Array.truncate 100
 
         let z =
             [
-                for k in ks ->
-                    [ for lambda in lambdas -> likelihood (k, lambda) paperSample ]
+                for lambda in lambdas ->
+                    [ for k in ks -> likelihood (k, lambda) paperSample ]
             ]
 
         Chart.Surface (

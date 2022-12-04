@@ -15,6 +15,15 @@ module Weibull =
         member this.Simulate (rng: Random) =
             let p = rng.NextDouble ()
             this.Lambda * (- log (1.0 - p)) ** (1.0 / this.K)
+        member this.CDF time =
+            1.0
+            - exp (- ((time / this.Lambda) ** this.K))
+        member this.PDF time =
+            (this.K / this.Lambda)
+            *
+            ((time / this.Lambda) ** (this.K - 1.0))
+            *
+            exp (- ((time / this.Lambda) ** this.K))
 
 module Simulation =
 
